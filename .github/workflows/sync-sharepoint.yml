@@ -1,0 +1,49 @@
+name: Sync presupuestos desde SharePoint
+
+on:
+  schedule:
+    # Cada 6 horas (UTC). Ajustar segun necesidad.
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-sharepoint
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: Install deps
+        run: pip install -r scripts/requirements.txt
+
+      - name: Sync Excel -> data.json
+        env:
+          SHAREPOINT_URL: ${{ secrets.SHAREPOINT_URL }}
+          SHAREPOINT_SHEET: ${{ vars.SHAREPOINT_SHEET }}
+        run: python scripts/sync_sharepoint.py
+
+      - name: Commit cambios si hay diff
+        run: |
+          if [ -n "$(git status --porcelain data.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data.json
+            git commit -m "chore(data): sync presupuestos desde SharePoint"
+            git push
+          else
+            echo "Sin cambios en data.json"
+          fi
