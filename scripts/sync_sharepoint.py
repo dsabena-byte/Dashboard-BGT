@@ -20,6 +20,7 @@ import io
 import json
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
 
@@ -224,6 +225,8 @@ def main() -> int:
     print(f"Total: {len(rows)} filas validas.")
 
     payload = {
+        "syncedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "source": "sharepoint",
         "columns": ["presupuesto", "cuenta", "anio", "mes", "concepto", "ars", "usd"],
         "rows": rows,
     }
