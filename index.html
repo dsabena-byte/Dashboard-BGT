@@ -62,7 +62,10 @@ select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,
 .kpi.featured .kpi-sub{color:#94a3b8}
 .kpi.featured .kpi-icon{background:rgba(255,255,255,0.08);color:#fff}
 .kpi-icon{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:8px;background:#f1f5f9;color:var(--muted);display:inline-flex;align-items:center;justify-content:center}
-.kpi-label{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px;padding-right:40px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-label{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px;padding-right:40px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:8px}
+.kpi-tag{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:6px;background:#e2e8f0;color:#0f172a;font-size:11px;font-weight:700;letter-spacing:0;text-transform:none}
+.kpi-tag.b{background:#fce7f3;color:#9d174d}
+.kpi.featured .kpi-tag{background:rgba(255,255,255,0.18);color:#fff}
 .kpi-val{font-size:30px;font-weight:700;letter-spacing:-0.02em;line-height:1.1;color:var(--primary);word-break:break-word}
 .kpi-val .unit{font-size:13px;font-weight:500;color:var(--muted);margin-left:6px}
 .kpi.featured .kpi-val{color:var(--primary)}
@@ -92,6 +95,8 @@ table{width:100%;border-collapse:collapse;font-size:13px}
 thead th{background:#f9fafb;color:var(--muted);font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;padding:10px 16px;text-align:left;white-space:nowrap;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
 tbody td{padding:11px 16px;border-top:1px solid var(--border);white-space:nowrap;color:var(--text)}
 tbody tr:hover td{background:#fafbfc}
+tfoot td{padding:12px 16px;border-top:2px solid var(--border-strong);background:#f9fafb;color:var(--text);font-weight:600;white-space:nowrap}
+tfoot td.label{font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted)}
 .cell-muted{color:var(--muted)}
 .num{text-align:right;font-variant-numeric:tabular-nums}
 
@@ -209,6 +214,7 @@ tbody tr:hover td{background:#fafbfc}
         <th class="num">% Var</th>
       </tr></thead>
       <tbody id="tbody"></tbody>
+      <tfoot id="tfoot"></tfoot>
     </table>
   </div>
 </div>
@@ -216,6 +222,7 @@ tbody tr:hover td{background:#fafbfc}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script>
 const MESES = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
 const MS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
@@ -297,15 +304,15 @@ function render(){
   document.getElementById('kpis').innerHTML=`
     <div class="kpi featured">
       <div class="kpi-icon">${ICONS.target}</div>
-      <div class="kpi-label">${pA}</div>
+      <div class="kpi-label"><span class="kpi-tag">A</span><span>${pA}</span></div>
       <div class="kpi-val">${fmt(vA)}</div>
-      <div class="kpi-sub">${rA.length} registros · ${mths.length} ${mths.length===1?'mes':'meses'}</div>
+      <div class="kpi-sub">Presupuesto de referencia · ${rA.length} registros</div>
     </div>
     <div class="kpi c-purple">
       <div class="kpi-icon">${ICONS.bars}</div>
-      <div class="kpi-label">${pB}</div>
+      <div class="kpi-label"><span class="kpi-tag b">B</span><span>${pB}</span></div>
       <div class="kpi-val">${fmt(vB)}</div>
-      <div class="kpi-sub">${rB.length} registros</div>
+      <div class="kpi-sub">Presupuesto de comparación · ${rB.length} registros</div>
     </div>
     <div class="kpi c-pink">
       <div class="kpi-icon">${ICONS.delta}</div>
@@ -317,21 +324,60 @@ function render(){
       <div class="kpi-icon">${ICONS.pct}</div>
       <div class="kpi-label">Variación %</div>
       <div class="kpi-val ${pct>=0?'pos':'neg'}">${pct>=0?'+':''}${pct.toFixed(1)}<span class="unit">%</span></div>
-      <div class="kpi-sub">${pA} vs ${pB}</div>
+      <div class="kpi-sub">A vs B</div>
     </div>`;
 
   const labels=mths.map(m=>MS[MESES.indexOf(m)]);
   const dA=mths.map(m=>Math.round(gs(sumD(rA.filter(r=>r[3]===m)))));
   const dB=mths.map(m=>Math.round(gs(sumD(rB.filter(r=>r[3]===m)))));
 
+  const desvAbs = mths.map((_,i)=> dA[i] - dB[i]);
+  const desvPct = mths.map((_,i)=> dB[i]!==0 ? ((dA[i]-dB[i])/Math.abs(dB[i])*100) : null);
+
   if(cBar) cBar.destroy();
   cBar=new Chart(document.getElementById('cBar'),{type:'bar',
     data:{labels,datasets:[
-      {label:pA,data:dA,backgroundColor:SERIES_A,borderRadius:4,maxBarThickness:30},
-      {label:pB,data:dB,backgroundColor:SERIES_B,borderRadius:4,maxBarThickness:30}
+      {label:pA,data:dA,backgroundColor:SERIES_A,borderRadius:3,
+        categoryPercentage:0.72, barPercentage:1.0,
+        datalabels:{
+          display:ctx=>{
+            const p=desvPct[ctx.dataIndex];
+            return p!==null && Math.abs(p) >= 0.5;
+          },
+          anchor:'end', align:'end', offset:2, clamp:true,
+          color:ctx=>{ const p=desvPct[ctx.dataIndex]; return p>=0?'#10b981':'#ef4444'; },
+          font:{size:10, weight:'700'},
+          formatter:(_,ctx)=>{
+            const p=desvPct[ctx.dataIndex];
+            if(p===null) return '';
+            return (p>=0?'+':'')+p.toFixed(0)+'%';
+          }
+        }
+      },
+      {label:pB,data:dB,backgroundColor:SERIES_B,borderRadius:3,
+        categoryPercentage:0.72, barPercentage:1.0,
+        datalabels:{display:false}
+      }
     ]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:tipOpts()},
+      layout:{padding:{top:18}},
+      plugins:{legend:{display:false},
+        tooltip:{
+          backgroundColor:'#0f172a',titleColor:'#fff',bodyColor:'#fff',
+          borderColor:'rgba(255,255,255,0.1)',borderWidth:1,padding:10,cornerRadius:6,
+          callbacks:{
+            label:c=> ' '+c.dataset.label+': '+fmt(c.raw),
+            afterBody:items=>{
+              if(!items.length) return '';
+              const i = items[0].dataIndex;
+              const d = desvAbs[i], p = desvPct[i];
+              const dTxt = (d>=0?'+':'') + fmt(d);
+              const pTxt = p===null ? '—' : (p>=0?'+':'')+p.toFixed(1)+'%';
+              return ['', 'Desvío: '+dTxt+'  ('+pTxt+')'];
+            }
+          }
+        }
+      },
       scales:{
         x:{ticks:{color:TICK_C,font:{size:11}},grid:{display:false}},
         y:{ticks:{color:TICK_C,callback:v=>fmtShort(v),font:{size:11}},grid:{color:GRID_C,drawBorder:false},border:{display:false}}
@@ -340,11 +386,30 @@ function render(){
   const cats=[...new Set(rA.map(r=>r[1]))];
   const dDon=cats.map(c=>Math.abs(Math.round(gs(sumD(rA.filter(r=>r[1]===c))))));
   if(cDonut) cDonut.destroy();
+  const donTotal = dDon.reduce((a,b)=>a+b,0);
   cDonut=new Chart(document.getElementById('cDonut'),{type:'doughnut',
     data:{labels:cats,datasets:[{data:dDon,backgroundColor:PIE_COLORS.slice(0,cats.length),borderWidth:2,borderColor:'#fff'}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'62%',
-      plugins:{legend:{display:true,position:'bottom',labels:{color:'#0f172a',font:{size:11},boxWidth:10,padding:8,usePointStyle:true}},
-        tooltip:tipOpts(true)}}});
+      plugins:{
+        legend:{display:true,position:'bottom',labels:{color:'#0f172a',font:{size:11},boxWidth:10,padding:8,usePointStyle:true}},
+        tooltip:{
+          backgroundColor:'#0f172a',titleColor:'#fff',bodyColor:'#fff',
+          borderColor:'rgba(255,255,255,0.1)',borderWidth:1,padding:10,cornerRadius:6,
+          callbacks:{label:c=>{
+            const pct = donTotal>0 ? (c.raw/donTotal*100).toFixed(1) : '0';
+            return ' '+c.label+': '+fmt(c.raw)+'  ('+pct+'%)';
+          }}
+        },
+        datalabels:{
+          color:'#fff', font:{size:11, weight:'700'},
+          formatter:(v)=>{
+            if(donTotal<=0) return '';
+            const p = v/donTotal*100;
+            return p >= 4 ? p.toFixed(0)+'%' : '';
+          },
+          textShadowColor:'rgba(0,0,0,0.35)', textShadowBlur:3
+        }
+      }}});
 
   let cA2=0,cB2=0;
   const cumA=dA.map(v=>{cA2+=v;return cA2;}), cumB=dB.map(v=>{cB2+=v;return cB2;});
@@ -355,7 +420,7 @@ function render(){
       {label:pB,data:cumB,borderColor:SERIES_B,backgroundColor:'rgba(236,72,153,0.06)',tension:0.35,pointRadius:3,pointBackgroundColor:SERIES_B,fill:true,borderWidth:2.5,borderDash:[6,4]}
     ]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:tipOpts()},
+      plugins:{legend:{display:false},tooltip:tipOpts(),datalabels:{display:false}},
       scales:{
         x:{ticks:{color:TICK_C,font:{size:11}},grid:{display:false}},
         y:{ticks:{color:TICK_C,callback:v=>fmtShort(v),font:{size:11}},grid:{color:GRID_C,drawBorder:false},border:{display:false}}
@@ -364,13 +429,25 @@ function render(){
   const keys=[...new Set([...rA.map(r=>r[1]+'||'+r[4]),...rB.map(r=>r[1]+'||'+r[4])])].sort();
   const tbody=document.getElementById('tbody');
   tbody.innerHTML='';
+  let totA=0, totB=0;
   keys.forEach(k=>{
     const [ct,conc]=k.split('||');
     const vA2=Math.round(gs(sumD(rA.filter(r=>r[1]===ct&&r[4]===conc))));
     const vB2=Math.round(gs(sumD(rB.filter(r=>r[1]===ct&&r[4]===conc))));
+    totA += vA2; totB += vB2;
     const d2=vA2-vB2, p2=vB2!==0?((vA2-vB2)/Math.abs(vB2)*100):0;
     tbody.innerHTML+=`<tr><td class="cell-muted">${ct}</td><td>${conc}</td><td class="num">${fmt(vA2)}</td><td class="num">${fmt(vB2)}</td><td class="num ${d2>=0?'pos':'neg'}">${fmt(d2)}</td><td class="num ${p2>=0?'pos':'neg'}">${vB2===0?'—':(p2>=0?'+':'')+p2.toFixed(1)+'%'}</td></tr>`;
   });
+  const totDiff = totA - totB;
+  const totPct = totB!==0 ? ((totA-totB)/Math.abs(totB)*100) : 0;
+  document.getElementById('tfoot').innerHTML = keys.length===0 ? '' :
+    `<tr>
+      <td class="label" colspan="2">Total</td>
+      <td class="num">${fmt(totA)}</td>
+      <td class="num">${fmt(totB)}</td>
+      <td class="num ${totDiff>=0?'pos':'neg'}">${fmt(totDiff)}</td>
+      <td class="num ${totPct>=0?'pos':'neg'}">${totB===0?'—':(totPct>=0?'+':'')+totPct.toFixed(1)+'%'}</td>
+    </tr>`;
 }
 
 function tipOpts(isDoughnut){
