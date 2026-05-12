@@ -316,15 +316,15 @@ function render(){
     </div>
     <div class="kpi c-pink">
       <div class="kpi-icon">${ICONS.delta}</div>
-      <div class="kpi-label">Diferencia (A − B)</div>
+      <div class="kpi-label">Diferencia (${pA} − ${pB})</div>
       <div class="kpi-val ${diff>=0?'pos':'neg'}">${fmt(diff)}</div>
-      <div class="kpi-sub">A ${diff>=0?'supera':'queda debajo de'} B</div>
+      <div class="kpi-sub">${pA} ${diff>=0?'supera a':'queda debajo de'} ${pB}</div>
     </div>
     <div class="kpi c-blue">
       <div class="kpi-icon">${ICONS.pct}</div>
       <div class="kpi-label">Variación %</div>
       <div class="kpi-val ${pct>=0?'pos':'neg'}">${pct>=0?'+':''}${pct.toFixed(1)}<span class="unit">%</span></div>
-      <div class="kpi-sub">A vs B</div>
+      <div class="kpi-sub">${pA} vs ${pB}</div>
     </div>`;
 
   const labels=mths.map(m=>MS[MESES.indexOf(m)]);
