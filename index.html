@@ -304,13 +304,13 @@ function render(){
   document.getElementById('kpis').innerHTML=`
     <div class="kpi featured">
       <div class="kpi-icon">${ICONS.target}</div>
-      <div class="kpi-label"><span class="kpi-tag">A</span><span>${pA}</span></div>
+      <div class="kpi-label">${pA}</div>
       <div class="kpi-val">${fmt(vA)}</div>
       <div class="kpi-sub">Presupuesto de referencia · ${rA.length} registros</div>
     </div>
     <div class="kpi c-purple">
       <div class="kpi-icon">${ICONS.bars}</div>
-      <div class="kpi-label"><span class="kpi-tag b">B</span><span>${pB}</span></div>
+      <div class="kpi-label">${pB}</div>
       <div class="kpi-val">${fmt(vB)}</div>
       <div class="kpi-sub">Presupuesto de comparación · ${rB.length} registros</div>
     </div>
