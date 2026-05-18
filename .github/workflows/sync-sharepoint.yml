@@ -36,14 +36,22 @@ jobs:
           SHAREPOINT_SHEET: ${{ vars.SHAREPOINT_SHEET }}
         run: python scripts/sync_sharepoint.py
 
-      - name: Commit cambios si hay diff
+           - name: Commit cambios si hay diff
         run: |
           if [ -n "$(git status --porcelain data.json)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add data.json
             git commit -m "chore(data): sync presupuestos desde SharePoint"
-            git push
+            for i in 1 2 3; do
+              if git push; then
+                echo "Push exitoso en intento $i"
+                break
+              fi
+              echo "Push rechazado, haciendo pull --rebase y reintentando ($i/3)..."
+              git pull --rebase origin main || true
+              sleep 2
+            done
           else
             echo "Sin cambios en data.json"
           fi
