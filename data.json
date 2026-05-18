@@ -1,5 +1,5 @@
 {
-"syncedAt": "2026-05-18T14:47:48+00:00",
+"syncedAt": "2026-05-18T15:01:05+00:00",
 "source": "sharepoint",
 "columns": [
 "presupuesto",
@@ -21793,6 +21793,42 @@
 ],
 [
 "REAL 2026",
+"INTEGRALES",
+"2026",
+"ENERO",
+"INTEGRALES",
+30246386,
+20939
+],
+[
+"REAL 2026",
+"INTEGRALES",
+"2026",
+"FEBRERO",
+"INTEGRALES",
+115936128,
+82341
+],
+[
+"REAL 2026",
+"INTEGRALES",
+"2026",
+"MARZO",
+"INTEGRALES",
+120292308,
+86046
+],
+[
+"REAL 2026",
+"INTEGRALES",
+"2026",
+"ABRIL",
+"INTEGRALES",
+37109190,
+27087
+],
+[
+"REAL 2026",
 "PUBLICIDAD.PRODUCCION Y AGENCIAS",
 "2026",
 "FEBRERO",
@@ -21855,7 +21891,7 @@
 0
 ],
 [
-"REAL 2027",
+"REAL 2026",
 "",
 "2027",
 "MAYO",
