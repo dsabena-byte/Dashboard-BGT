@@ -1,5 +1,5 @@
 {
-"syncedAt": "2026-05-19T14:54:45+00:00",
+"syncedAt": "2026-05-19T19:52:32+00:00",
 "source": "sharepoint",
 "columns": [
 "presupuesto",
@@ -21410,8 +21410,8 @@
 "2026",
 "MAYO",
 "AGENCIAS VARIAS",
-5693152,
-3668
+6233100,
+4016
 ],
 [
 "REAL 2026",
@@ -21896,6 +21896,24 @@
 "2026",
 "MAYO",
 "PAUTA ATL",
+5196056,
+0
+],
+[
+"REAL 2026",
+"PUBLICIDAD TV",
+"2026",
+"MAYO",
+"PAUTA ATL",
+179969,
+0
+],
+[
+"REAL 2026",
+"PUBLICIDAD TV",
+"2026",
+"MAYO",
+"PAUTA ATL",
 1065000,
 686
 ],
@@ -22022,8 +22040,8 @@
 "2026",
 "MAYO",
 "AGENCIAS VARIAS",
-5175000,
-3334
+0,
+0
 ],
 [
 "REAL 2026",
