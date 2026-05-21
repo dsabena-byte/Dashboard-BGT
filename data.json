@@ -1,5 +1,5 @@
 {
-"syncedAt": "2026-05-21T09:35:26+00:00",
+"syncedAt": "2026-05-21T15:00:00+00:00",
 "source": "sharepoint",
 "columns": [
 "presupuesto",
@@ -21906,6 +21906,15 @@
 "MAYO",
 "PAUTA ATL",
 179969,
+0
+],
+[
+"REAL 2026",
+"PUBLICIDAD TV",
+"2026",
+"MAYO",
+"PAUTA ATL",
+339685,
 0
 ],
 [
