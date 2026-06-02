@@ -1,5 +1,5 @@
 {
-"syncedAt": "2026-06-02T10:17:35+00:00",
+"syncedAt": "2026-06-02T16:17:39+00:00",
 "source": "sharepoint",
 "columns": [
 "presupuesto",
@@ -21860,8 +21860,8 @@
 "2026",
 "JUNIO",
 "ACTIVACIONES WOW",
-38800000,
-25000
+45100000,
+29059
 ],
 [
 "REAL 2026",
@@ -22112,8 +22112,8 @@
 "2026",
 "JUNIO",
 "ACTIVACIONES WOW",
-120000,
-77
+720000,
+464
 ],
 [
 "REAL 2026",
@@ -22130,8 +22130,17 @@
 "2026",
 "JUNIO",
 "ACTIVACIONES WOW",
-9900000,
-6379
+1100000,
+709
+],
+[
+"REAL 2026",
+"PUBLICIDAD EXHIBICIONES",
+"2026",
+"JUNIO",
+"ACTIVACIONES WOW",
+630000,
+406
 ],
 [
 "REAL 2026",
