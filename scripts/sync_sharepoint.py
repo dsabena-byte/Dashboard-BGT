@@ -20,6 +20,7 @@ import io
 import json
 import os
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
@@ -79,30 +80,123 @@ MESES_VALIDOS = {
 MIN_MATCH = 5  # cuantas columnas REQUIRED tiene que matchear una fila para tratarla como headers
 HEADER_SCAN_ROWS = 25
 
+USER_AGENT = "Mozilla/5.0 (SharePointSync Dashboard-BGT)"
+HTTP_TIMEOUT = 60
+MAX_RETRIES = 3          # reintentos ante fallos de red transitorios
+RETRY_BACKOFF = 2        # segundos base; crece 2s, 4s, 8s...
 
-def build_download_url(share_url: str) -> str:
+# Firmas que delatan que SharePoint devolvio una pagina de login / error HTML
+# en vez del archivo. Se buscan (en minuscula) dentro de los primeros bytes.
+LOGIN_HINTS = (
+    "sign in", "iniciar sesi", "login", "_layouts/15/error.aspx",
+    "the link you have accessed", "el vinculo al que accedi",
+    "this link has expired", "ha expirado", "access denied", "acceso denegado",
+)
+
+
+def build_download_urls(share_url: str) -> list[str]:
+    """Devuelve variantes de URL de descarga directa para probar en orden.
+
+    SharePoint/OneDrive acepta forzar la descarga de un share link agregando
+    el parametro ?download=1. Igual probamos tambien la URL original por si la
+    variante con download rompe la firma del link.
+    """
     parsed = urlparse(share_url)
     query = dict(parse_qsl(parsed.query))
-    query["download"] = "1"
-    return urlunparse(parsed._replace(query=urlencode(query)))
+
+    variants: list[str] = []
+
+    # 1) original + download=1 (la que viene funcionando)
+    q_dl = dict(query)
+    q_dl["download"] = "1"
+    variants.append(urlunparse(parsed._replace(query=urlencode(q_dl))))
+
+    # 2) original tal cual (algunos tenants sirven el binario directo)
+    variants.append(share_url)
+
+    # Quitar duplicados conservando el orden.
+    seen: set[str] = set()
+    out: list[str] = []
+    for v in variants:
+        if v not in seen:
+            seen.add(v)
+            out.append(v)
+    return out
+
+
+def _looks_like_login(blob: bytes) -> bool:
+    head = blob[:4000].decode("utf-8", errors="ignore").lower()
+    return any(hint in head for hint in LOGIN_HINTS)
+
+
+def _fetch(url: str) -> requests.Response:
+    """GET con reintentos ante errores de red / 5xx transitorios."""
+    last_exc: Exception | None = None
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            resp = requests.get(
+                url,
+                headers={"User-Agent": USER_AGENT},
+                allow_redirects=True,
+                timeout=HTTP_TIMEOUT,
+            )
+        except requests.RequestException as exc:
+            last_exc = exc
+            if attempt < MAX_RETRIES:
+                wait = RETRY_BACKOFF * (2 ** (attempt - 1))
+                print(f"  Fallo de red ({exc.__class__.__name__}), "
+                      f"reintentando en {wait}s ({attempt}/{MAX_RETRIES})...")
+                time.sleep(wait)
+                continue
+            raise RuntimeError(
+                f"No se pudo conectar a SharePoint tras {MAX_RETRIES} intentos: {exc}"
+            ) from exc
+
+        # 5xx -> transitorio, reintentar. 4xx -> permanente, cortar.
+        if 500 <= resp.status_code < 600 and attempt < MAX_RETRIES:
+            wait = RETRY_BACKOFF * (2 ** (attempt - 1))
+            print(f"  HTTP {resp.status_code} del servidor, "
+                  f"reintentando en {wait}s ({attempt}/{MAX_RETRIES})...")
+            time.sleep(wait)
+            continue
+        return resp
+
+    # Solo llega aca si se agotaron los reintentos por RequestException.
+    raise RuntimeError(f"No se pudo conectar a SharePoint: {last_exc}")
 
 
 def download_excel(share_url: str) -> bytes:
-    url = build_download_url(share_url)
-    resp = requests.get(
-        url,
-        headers={"User-Agent": "Mozilla/5.0 (SharePointSync Dashboard-BGT)"},
-        allow_redirects=True,
-        timeout=60,
-    )
-    resp.raise_for_status()
-    if resp.content[:4] != b"PK\x03\x04":
+    urls = build_download_urls(share_url)
+    problems: list[str] = []
+
+    for url in urls:
+        resp = _fetch(url)
+
+        if resp.status_code != 200:
+            problems.append(f"HTTP {resp.status_code} en {url[:80]}...")
+            continue
+
+        blob = resp.content
+        if blob[:4] == b"PK\x03\x04":
+            return blob  # xlsx valido
+
         ctype = resp.headers.get("Content-Type", "")
-        raise RuntimeError(
-            "La URL no devolvio un .xlsx. Verifica que el link sea publico "
-            f"('anyone with the link'). Content-Type: {ctype}"
-        )
-    return resp.content
+        if _looks_like_login(blob):
+            problems.append(
+                f"{url[:80]}... devolvio una pagina de login/expirado "
+                f"(Content-Type: {ctype})"
+            )
+        else:
+            problems.append(
+                f"{url[:80]}... no devolvio un .xlsx (Content-Type: {ctype})"
+            )
+
+    raise RuntimeError(
+        "No se pudo descargar el Excel desde SharePoint. Causa mas probable: "
+        "el link caduco o ya no es publico. Regenera el link como "
+        "'Cualquier persona con el vinculo' y actualiza el secret SHAREPOINT_URL.\n"
+        "Detalle de los intentos:\n  - " + "\n  - ".join(problems)
+    )
 
 
 def normalize_header(h) -> str:
