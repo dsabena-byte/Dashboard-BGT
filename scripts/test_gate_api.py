@@ -11,6 +11,12 @@ puerta de la app de la aerolinea.
 Uso:
     pip install -r scripts/requirements.txt
 
+    # FlightAware AeroAPI - el unico que declara puerta y terminal reales
+    # con cobertura de Centroamerica (Panama). Tramo Personal: credito de
+    # USD 5/mes, sin minimo. No incluye alertas ni historico.
+    export AEROAPI_KEY=xxxxx
+    python3 scripts/test_gate_api.py
+
     # Aviationstack (plan gratis: 100 consultas/mes, solo HTTP)
     export AVIATIONSTACK_KEY=xxxxx
     python3 scripts/test_gate_api.py
@@ -21,6 +27,10 @@ Uso:
 
     # un vuelo puntual
     python3 scripts/test_gate_api.py CM320
+
+Se pueden definir varias keys a la vez: corre contra todos los proveedores
+disponibles y muestra un cuadro por cada uno, que es la forma de comparar
+cobertura sobre los mismos vuelos.
 
 Que mirar en la salida:
     - Si `gate` sale OK para vuelos del dia de hoy -> la API sirve.
@@ -34,9 +44,15 @@ Que mirar en la salida:
 import json
 import os
 import sys
+import time
 from datetime import date
 
 import requests
+
+# El tramo gratis de AeroAPI limita rafagas: una docena de llamadas seguidas
+# devuelve 429. Espaciamos y reintentamos.
+PAUSA_ENTRE_LLAMADAS = 1.2
+REINTENTOS_429 = 3
 
 # Vuelos del grupo que hacen escala en PTY, MDE o BOG.
 VUELOS = [
@@ -62,11 +78,60 @@ def _cell(value):
     return str(value)
 
 
+def _get(url, **kwargs):
+    """GET con reintento ante 429, que es lo que tira el tramo gratis."""
+    for intento in range(REINTENTOS_429):
+        r = requests.get(url, timeout=TIMEOUT, **kwargs)
+        if r.status_code != 429:
+            return r
+        espera = PAUSA_ENTRE_LLAMADAS * (2 ** intento)
+        print("      429, esperando {:.0f}s...".format(espera))
+        time.sleep(espera)
+    return r
+
+
+# Prefijo ICAO por aerolinea: AeroAPI identifica los vuelos asi.
+ICAO = {"CM": "CMP", "AV": "AVA", "AR": "ARG"}
+
+
+def probe_aeroapi(key, flight_iata):
+    """AeroAPI v4 expone gate_origin / gate_destination a nivel de vuelo."""
+    prefijo = ICAO.get(flight_iata[:2])
+    ident = (prefijo + flight_iata[2:]) if prefijo else flight_iata
+
+    url = "https://aeroapi.flightaware.com/aeroapi/flights/{}".format(ident)
+    r = _get(url, headers={"x-apikey": key}, params={"max_pages": 1})
+
+    if r.status_code == 401:
+        return {"error": "key rechazada (401)"}
+    if r.status_code == 404:
+        return {"error": "sin vuelos para {}".format(ident)}
+    r.raise_for_status()
+
+    vuelos = (r.json() or {}).get("flights") or []
+    if not vuelos:
+        return {"error": "sin vuelos programados"}
+
+    f = vuelos[0]
+    origen = f.get("origin") or {}
+    destino = f.get("destination") or {}
+    return {
+        "estado": f.get("status"),
+        "fecha": (f.get("scheduled_out") or "")[:10],
+        "dep_iata": origen.get("code_iata"),
+        "dep_terminal": f.get("terminal_origin"),
+        "dep_gate": f.get("gate_origin"),
+        "arr_iata": destino.get("code_iata"),
+        "arr_terminal": f.get("terminal_destination"),
+        "arr_gate": f.get("gate_destination"),
+    }
+
+
 def probe_aviationstack(key, flight_iata):
     """Aviationstack documenta gate/terminal/baggage. Plan gratis: solo HTTP."""
     url = "http://api.aviationstack.com/v1/flights"
     params = {"access_key": key, "flight_iata": flight_iata, "limit": 1}
-    r = requests.get(url, params=params, timeout=TIMEOUT)
+    r = _get(url, params=params)
     r.raise_for_status()
     payload = r.json()
 
@@ -96,7 +161,7 @@ def probe_aerodatabox(key, flight_iata):
     hoy = date.today().isoformat()
     url = "https://aerodatabox.p.rapidapi.com/flights/number/{}/{}".format(flight_iata, hoy)
     headers = {"X-RapidAPI-Key": key, "X-RapidAPI-Host": "aerodatabox.p.rapidapi.com"}
-    r = requests.get(url, headers=headers, params={"withLocation": "false"}, timeout=TIMEOUT)
+    r = _get(url, headers=headers, params={"withLocation": "false"})
 
     if r.status_code == 404:
         return {"error": "sin vuelo para hoy"}
@@ -121,6 +186,7 @@ def probe_aerodatabox(key, flight_iata):
 
 
 PROVEEDORES = [
+    ("aeroapi", "AEROAPI_KEY", probe_aeroapi),
     ("aviationstack", "AVIATIONSTACK_KEY", probe_aviationstack),
     ("aerodatabox", "RAPIDAPI_KEY", probe_aerodatabox),
 ]
@@ -137,7 +203,9 @@ def correr(nombre, probe, key, vuelos):
     con_gate = 0
     consultados = 0
 
-    for iata, ruta, nota in vuelos:
+    for idx, (iata, ruta, nota) in enumerate(vuelos):
+        if idx:
+            time.sleep(PAUSA_ENTRE_LLAMADAS)
         try:
             res = probe(key, iata)
         except requests.RequestException as exc:
@@ -192,7 +260,7 @@ def main():
 
     if not activos:
         print(__doc__)
-        print("Falta la key. Defini AVIATIONSTACK_KEY o RAPIDAPI_KEY y volve a correr.")
+        print("Falta la key. Defini AEROAPI_KEY, AVIATIONSTACK_KEY o RAPIDAPI_KEY y volve a correr.")
         return 1
 
     print("Probando {} vuelo(s) contra {} proveedor(es).".format(len(vuelos), len(activos)))
